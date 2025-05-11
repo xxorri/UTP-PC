@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head > <link rel="stylesheet" href="tampilan.css"> </head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Simple Digital Image Processing</title>
+<style>
+  /* Note saat di running program menggunakan laragon */
+  /* Reset and base bagian tampilan website */
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0; padding: 0;
+    background: #121212;
+    color: #eee;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 600px;
+    max-width: 350px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 10px;
+  }
+  h1 {
+    font-weight: 700;
+    font-size: 1.6rem;
+    margin-bottom: 0.4rem;
+    color: #3fcf8e;
+  }
+  label {
+    display: block;
+    margin-top: 10px;
+    font-weight: 600;
+    font-size: 1rem;
+    color: #b0f2c5;
+  }
+  select, input[type=range], input[type=number] {
+    width: 100%;
+    margin-top: 5px;
+    border-radius: 6px;
+    border: none;
+    padding: 8px;
+    font-size: 1rem;
+    background: #222;
+    color: #eee;
+    appearance: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px;
+    background: #3fcf8e;
+    cursor: pointer;
+    border-radius: 50%;
+    border: none;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 20px; height: 20px;
+    background: #3fcf8e;
+    cursor: pointer;
+    border-radius: 50%;
+    border: none;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    height: 8px;
+    background: #2a2a2a;
+    cursor: pointer;
+    margin-bottom: 5px;
+  }
+
+  button {
+    background: #3fcf8e;
+    color: #121212;
+    border: none;
+    font-weight: 700;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    margin-top: 15px;
+    width: 100%;
+    transition: background 0.3s ease;
+  }
+  button:hover {
+    background: #36b776;
+  }
+
+  .canvas-container {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 15px;
+    width: 100%;
+    gap: 10px;
+  }
+  canvas {
+    border: 1px solid #3fcf8e;
+    border-radius: 8px;
+    max-width: 48%;
+    height: auto;
+    max-height: 250px;
+    background: #000;
+  }
+  .canvas-label {
+    text-align: center;
+    font-size: 0.9rem;
+    margin-top: 4px;
+    color: #76d8a0;
+    user-select: none;
+  }
+
+  /* Responsive for mobile */
+  @media (max-width: 400px) {
+    body {
+      max-width: 100%;
+      padding: 10px 15px;
+    }
+    .canvas-container {
+      flex-direction: column;
+      align-items: center;
+      width: 500;
+      height: 500;
+    }
+    canvas {
+      max-width: 100%;
+      margin-bottom: 15px;
+    }
+  }
+</style>
+</head>
+<body>
+  <h1>Digital Image Processing Riri H_121</h1>
+
+  <label for="imageUpload">Upload Image</label>
+  <input type="file" id="imageUpload" accept="image/*" />
+
+  <label for="imageType">Jenis Citra</label>
+  <select id="imageType">
+    <option value="original">Original (No change)</option>
+    <option value="grayscale">Grayscale</option>
+    <option value="binary">Biner (Threshold)</option>
+  </select>
+
+  <label for="brightness">Brightness (-100 to 100)</label>
+  <input type="range" id="brightness" min="-100" max="100" value="0" />
+
+  <label for="contrast">Contrast (-100 to 100)</label>
+  <input type="range" id="contrast" min="-100" max="100" value="0" />
+
+  <label for="filter">Filter</label>
+  <select id="filter">
+    <option value="none">Tidak Ada</option>
+    <option value="average">Filter Rerata (Average)</option>
+    <option value="median">Filter Median</option>
+    <option value="sobel">Filter Batas (Sobel)</option>
+  </select>
+
+  <label>Operasi Geometri</label>
+
+  <label for="translateX">Translasi X (px)</label>
+  <input type="number" id="translateX" value="0" min="-100" max="100" step="1" />
+
+  <label for="translateY">Translasi Y (px)</label>
+  <input type="number" id="translateY" value="0" min="-100" max="100" step="1" />
+
+  <label for="rotation">Rotasi (derajat)</label>
+  <input type="number" id="rotation" value="0" min="-360" max="360" step="1" />
+
+  <label for="scale">Scaling (%)</label>
+  <input type="number" id="scale" value="100" min="10" max="300" step="1" />
+
+  <button id="processBtn" aria-label="Proses Gambar">Proses Gambar</button>
+
+  <div class="canvas-container" aria-live="polite" aria-atomic="true">
+    <div>
+      <canvas id="originalCanvas" width="500" height="500" aria-label="Gambar Asli"></canvas>
+      <div class="canvas-label">Gambar Asli</div>
+    </div>
+    <div>
+      <canvas id="processedCanvas" width="500" height="500" aria-label="Gambar Hasil"></canvas>
+      <div class="canvas-label">Gambar Hasil</div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const imageUpload = document.getElementById('imageUpload');
+  const imageType = document.getElementById('imageType');
+  const brightnessInput = document.getElementById('brightness');
+  const contrastInput = document.getElementById('contrast');
+  const filterSelect = document.getElementById('filter');
+  const translateXInput = document.getElementById('translateX');
+  const translateYInput = document.getElementById('translateY');
+  const rotationInput = document.getElementById('rotation');
+  const scaleInput = document.getElementById('scale');
+  const processBtn = document.getElementById('processBtn');
+
+  const originalCanvas = document.getElementById('originalCanvas');
+  const processedCanvas = document.getElementById('processedCanvas');
+  const originalCtx = originalCanvas.getContext('2d');
+  const processedCtx = processedCanvas.getContext('2d');
+
+  let originalImage = new Image();
+  let imageLoaded = false;
+
+  // Untuk Upload Image
+  imageUpload.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      originalImage = new Image();
+      originalImage.onload = () => {
+        imageLoaded = true;
+        drawOriginal();
+        clearProcessed();
+      };
+      originalImage.src = evt.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Untuk menampilkan gambar asli dengan rasio yang sama agar tidak terpotong
+  function drawOriginal() {
+    originalCtx.clearRect(0, 0, originalCanvas.width, originalCanvas.height);
+    let w = originalImage.width;
+    let h = originalImage.height;
+
+    // Menghitung skala agar sesuai dengan canvas
+    const scale = Math.min(originalCanvas.width / w, originalCanvas.height / h);
+    const nw = w * scale;
+    const nh = h * scale;
+    const dx = (originalCanvas.width - nw) / 2;
+    const dy = (originalCanvas.height - nh) / 2;
+    originalCtx.drawImage(originalImage, 0, 0, w, h, dx, dy, nw, nh);
+  }
+
+  // Membersihkan canvas yang telah diproses
+  function clearProcessed() {
+    processedCtx.clearRect(0, 0, processedCanvas.width, processedCanvas.height);
+  }
+
+  // Clamp value helper
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+  // OPERASI JENIS CITRA
+  // Konversi Gambar ke grayscale
+  function toGrayscale(imageData) {
+    // Iterasi setiap piksel (setiap piksel terdiri dari 4 elemen: R, G, B, A)
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      // Hitung nilai grayscale menggunakan rumus luminance
+      // 0.299*R + 0.587*G + 0.114*B adalah rumus standar untuk persepsi kecerahan manusia
+      const gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+      // Set ketiga komponen warna (R, G, B) ke nilai grayscale
+      data[i] = data[i+1] = data[i+2] = gray;
+    }
+  }
+  // OPERASI PIKSEL
+  // Konversi Gambar menjadi biner menggunakan threshold 128 
+  function toBinary(imageData, threshold=128) {
+    // Ambil array RGBA dari gambar
+    const data = imageData.data;
+    // Iterasi setiap piksel (4 elemen per piksel: R, G, B, A)
+    for (let i=0; i < data.length; i += 4) {
+      // Hitung nilai grayscale dari piksel menggunakan rumus luminance
+      const gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+      // Terapkan thresholding: jika grayscale >= threshold, set putih (255), jika tidak hitam (0)
+      const val = gray >= threshold ? 255 : 0;
+      data[i] = data[i+1] = data[i+2] = val; // Set semua kanal warna (R, G, B) ke nilai biner (0 atau 255)
+    }
+  }
+
+  // Mengatur kecerahan (brightness) -100 ke 100 dan kontras (contrast) -100 ke 100
+  function adjustBrightnessContrast(imageData, brightness=0, contrast=0) {
+    const data = imageData.data;
+    // Ubah nilai brightness ke skala 0–255 (karena tiap kanal warna 0–255)
+    const b = brightness * 255 / 100;
+    // Hitung faktor kontras: (contrast + 100) / 100 lalu dikuadratkan
+    const c = Math.pow((contrast + 100) / 100, 2);
+    // Iterasi setiap piksel (setiap 4 elemen: R, G, B, A)
+    for (let i=0; i < data.length; i += 4) {
+      for(let cIdx = 0; cIdx<3; cIdx++) {
+        let val = data[i+cIdx];
+        val = val + b; // Tambah brightness
+        // Sesuaikan kontras:
+        // - Pusatkan nilai di sekitar 0.5 (dalam skala 0–1)
+        // - Kalikan dengan faktor kontras
+        // - Geser kembali dan ubah ke skala 0–255
+        val = ((val/255 - 0.5)*c + 0.5) * 255;
+        data[i+cIdx] = clamp(val, 0, 255);
+      }
+    }
+  }
+
+  // OPERASI FILTER
+  // Filter rata - rata (3x3) untuk peredaman noise  dan gambar menjadi leboh halus
+  function filterAverage(imageData) {
+    // Memanggil fungsi filterConvolution dengan kernel rata rata 3x3
+    return filterConvolution(imageData, [ // Setiap elemen bernilai 1/9, mempunyai total 1 (rata rata 9 piksel)
+      [1/9,1/9,1/9],
+      [1/9,1/9,1/9],
+      [1/9,1/9,1/9]
+    ]);
+  }
+
+  // Filter median (3x3) mengurangi noise pada salt dan pepper noise
+  function filterMedian(imageData) {
+    const w = imageData.width; // Mengatur lebar gambar
+    const h = imageData.height; // Mengatur tinggi gambar
+    const data = imageData.data; // Array RGBA
+    const output = new Uint8ClampedArray(data.length); // Hasil array output
+
+    // Funsi untuk mengambil piksel dengan batas gambar
+    function getPixel(x,y,c) {
+      // Mencegah agar koordinat tidak keluar gambar
+      if (x < 0) x = 0;
+      if (x >= w) x = w-1;
+      if (y < 0) y = 0;
+      if (y >= h) y = h - 1;
+      return data[(y*w + x)*4 + c]; // Mengambil kanal gambar (R, G,, B)
+    }
+    // Iterasi setiap piksel dalam gambar
+    for (let y=0; y<h; y++) {
+      for (let x=0; x<w; x++) {
+        for (let c=0; c<3; c++) { // Proses R, G, B
+          let neighbors = [];
+          // Kumpulan 9 tetangga piksel dalam filter 3x3
+          for (let dy=-1; dy<=1; dy++) {
+            for (let dx=-1; dx<=1; dx++) { 
+              neighbors.push(getPixel(x+dx, y+dy, c));
+            }
+          }
+          // Mengurutkan nilai tetangga dan mengambil media pada indeks ke -4 dari 0 -8
+          neighbors.sort((a,b)=>a-b);
+          output[(y*w + x)*4 + c] = neighbors[4]; // Median dari 9 piksel
+        }
+        output[(y*w + x)*4 + 3] = 255; // Menetapkan nilai alpha tetap 255 (tidak transparan)
+      }
+    }
+    imageData.data.set(output); // Masukan hasil ke objel imagedata dan kembalikan
+    return imageData;
+  }
+
+  // Filter Sobel untuk mendeteksi gambar tepi
+  function filterSobel(imageData) {
+    const w = imageData.width; // Mengatur lebar gambar
+    const h = imageData.height; // Mengatur tinggi gambar
+    const data = imageData.data; // Data RGAB pada gambar
+    // Array untuk menyimpan nilai grayscale
+    const grayscale = new Uint8ClampedArray(w*h);
+
+    // Gamber warna akan di Konversi ke grayscale
+    for (let y=0; y<h; y++) {
+      for (let x=0; x<w; x++) {
+        const i = (y*w + x)*4;
+        const gray = 0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2];
+        grayscale[y*w + x] = gray; // Menyimpan hasil grayscale
+      }
+    }
+
+    const output = new Uint8ClampedArray(data.length); // Menyimpan hasil akhir
+    // Definisi kernel sobel mendeteksi tepi horizontal (Gx) dan vertikal (gy)
+    const gxKernel = [
+      [-1,0,1],
+      [-2,0,2],
+      [-1,0,1]
+    ];
+    const gyKernel = [
+      [-1,-2,-1],
+      [0,0,0],
+      [1,2,1]
+    ];
+    // Fungsi mengambil nilai grayscale dengan penangan batas
+    function getGray(x,y) {
+      if (x<0) x=0;
+      if (x>=w) x=w-1;
+      if (y<0) y=0;
+      if (y>=h) y=h-1;
+      return grayscale[y*w + x];
+    }
+    // Iterasi setiap piksel untuk menghitung gradian menggunakan kernel sobel
+    for (let y=0; y<h; y++) {
+      for (let x=0; x<w; x++) {
+        let gx = 0; // Gradien horizontal
+        let gy = 0; // Gradien vertikal
+        // Aplikasikan kernel 3x3
+        for (let ky=-1; ky<=1; ky++) {
+          for (let kx=-1; kx<=1; kx++) {
+            const val = getGray(x+kx, y+ky);
+            gx += gxKernel[ky+1][kx+1] * val;
+            gy += gyKernel[ky+1][kx+1] * val;
+          }
+        }
+        // Menghitung magnitude dari gradien
+        const mag = clamp(Math.sqrt(gx*gx + gy*gy), 0, 255);
+        const idx = (y*w + x)*4;
+        // Menyimpan nilai tepi ke  kanal RGB dan alpha tetap 255
+        output[idx] = output[idx+1] = output[idx+2] = mag;
+        output[idx+3] = 255;
+      }
+    }
+    imageData.data.set(output); //menyimpan hasil akhir
+    return imageData;
+  }
+
+  // Filter Konvolusi 3x3
+  function filterConvolution(imageData, kernel) {
+    const w = imageData.width;
+    const h = imageData.height;
+    const data = imageData.data;
+    const output = new Uint8ClampedArray(data.length);
+
+    function getPixel(x,y,c) {
+      if (x < 0) x = 0;
+      if (x >= w) x = w - 1;
+      if (y < 0) y = 0;
+      if (y >= h) y = h - 1;
+      return data[(y*w + x)*4 + c];
+    }
+
+    for (let y=0; y<h; y++) {
+      for (let x=0; x<w; x++) {
+        for (let c=0; c<3; c++) {
+          let val = 0;
+          for (let ky=-1; ky<=1; ky++) {
+            for (let kx=-1; kx<=1; kx++) {
+              val += kernel[ky+1][kx+1] * getPixel(x+kx, y+ky, c);
+            }
+          }
+          output[(y*w + x)*4 + c] = clamp(val, 0, 255);
+        }
+        output[(y*w + x)*4 + 3] = 255;
+      }
+    }
+    imageData.data.set(output);
+    return imageData;
+  }
+  // OPERASI GEOMETRIC
+  // geometric transformation untuk translation, rotation, scale
+  function applyGeometricTransform(ctx, image, translateX, translateY, rotationDeg, scale) {
+    // Membersihkan isi kanvas yang sebelumnya telah diproses
+    ctx.clearRect(0, 0, processedCanvas.width, processedCanvas.height);
+
+    // Menyimpan status konteks awal (transformasi, warna, dll)
+    ctx.save();
+
+    // Menghitung titik tengah canvas
+    const cx = processedCanvas.width / 2;
+    const cy = processedCanvas.height / 2;
+    // Translasi ke tengah agar rotasi dan skala berpusat di tengah
+    ctx.translate(cx, cy);
+    // Menambahkan translasi tambahan dari parameter
+    ctx.translate(translateX, translateY);
+
+    // Merotasi gambar bedasarkan derajat yang dikonvesi ke radian
+    ctx.rotate(rotationDeg * Math.PI/180);
+
+    // Menerapkan skala dari parameter
+    ctx.scale(scale, scale);
+
+    // Ukuran asli
+    let w = image.width;
+    let h = image.height;
+    // Menghitung skala gambar tetap muat dalam canvas
+    const maxDim = Math.max(w,h);
+    const scaleToFit = Math.min(processedCanvas.width, processedCanvas.height) / maxDim;
+    // Gambar pada koordinat baru (ditransformasikan)
+    // Gambar diposisikan dari tengah (-w/2, -h/2) agar rotasi dan skala simetris
+    ctx.drawImage(image, -w/2 * scaleToFit, -h/2 * scaleToFit, w * scaleToFit, h * scaleToFit);
+
+    // Mengembalikan ke kondisi awal
+    ctx.restore();
+  }
+
+  // Fungsi utama pemrosesan pada gambar
+  function processImage() {
+    if (!imageLoaded) {
+      alert("Silakan unggah gambar terlebih dahulu.");
+      return;
+    }
+    // Menampilkan gambar asli
+    drawOriginal();
+
+    // Gambar asli ke dalam prosesCanvas di luar layar untuk mendapatkan ImageData
+    // Membuat elemen <canvas> baru yang tidak ditampilkan (off-screen)
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = originalImage.width; // Menyesuaikan ukuran offCanvas sesuai ukuran asli gambar
+    offCanvas.height = originalImage.height;
+    // Mengambil konteks 2D dari offCanvas untuk menggambar
+    const offCtx = offCanvas.getContext('2d');
+    offCtx.drawImage(originalImage, 0, 0);
+    // ImageData ini akan digunakan untuk pemrosesan seperti filter, konversi, dll.
+    let imageData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
+
+    // Menerapkan Operasi Jenis citra
+    const type = imageType.value;
+    if (type === 'grayscale') {
+      toGrayscale(imageData);
+      // Panggil fungsi untuk mengubah gambar menjadi citra biner berdasarkan threshold
+    } else if (type === 'binary') {
+      toBinary(imageData);
+    }
+
+    // Menerapkan Operasi Brightness dan contrast
+    adjustBrightnessContrast(imageData, Number(brightnessInput.value), Number(contrastInput.value));
+
+    // Menerapkan Operasi Filter
+    const filter = filterSelect.value;
+    if (filter === 'average') {
+      imageData = filterAverage(imageData);
+    } else if (filter === 'median') {
+      imageData = filterMedian(imageData);
+    } else if (filter === 'sobel') {
+      imageData = filterSobel(imageData);
+    }
+
+    // Mengembalikan data gambar yang telah diproses
+    offCtx.putImageData(imageData, 0, 0);
+
+    // Menerapkan Operasi geometric 
+    const translateX = Number(translateXInput.value);
+    const translateY = Number(translateYInput.value);
+    const rotation = Number(rotationInput.value);
+    const scalePerc = Number(scaleInput.value);
+    const scale = scalePerc / 100;
+
+    // Membersihkan kanvas yang sudah diproses sebelumnya
+    processedCtx.clearRect(0, 0, processedCanvas.width, processedCanvas.height);
+
+    processedCtx.save();
+
+    // Memindahkan asal konteks ke tengah canvas
+    const cx = processedCanvas.width / 2;
+    const cy = processedCanvas.height / 2;
+    processedCtx.translate(cx, cy);
+
+    // Menerapkan translation
+    processedCtx.translate(translateX, translateY);
+
+    // Menerapkan rotation
+    processedCtx.rotate(rotation * Math.PI / 180);
+
+    // Menerapkan scale
+    processedCtx.scale(scale, scale);
+
+    // Menampilkan gambar asli dan gambar hasil setelah di proses
+    // Fit image into canvas based on max dimension
+    let w = offCanvas.width;
+    let h = offCanvas.height;
+    const maxDim = Math.max(w,h);
+    const scaleToFit = Math.min(processedCanvas.width, processedCanvas.height) / maxDim;
+
+    processedCtx.drawImage(offCanvas, -w/2 * scaleToFit, -h/2 * scaleToFit, w * scaleToFit, h * scaleToFit);
+
+    processedCtx.restore();
+  }
+
+  processBtn.addEventListener('click', () => {
+    processImage();
+  });
+
+})();
+</script>
+</body>
+</html>
+</content>
+</create_file>
